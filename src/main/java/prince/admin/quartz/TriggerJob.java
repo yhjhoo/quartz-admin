@@ -1,4 +1,4 @@
-package com.mkyong.common;
+package prince.admin.quartz;
 
 import java.io.IOException;
 

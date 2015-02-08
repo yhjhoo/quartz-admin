@@ -1,4 +1,4 @@
-package com.mkyong.common;
+package prince.admin.quartz;
 
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
