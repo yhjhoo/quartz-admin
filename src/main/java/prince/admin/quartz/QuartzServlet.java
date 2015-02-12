@@ -11,8 +11,11 @@ import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.*;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.quartz.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.quartz.CronTriggerBean;
 import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 import org.springframework.web.context.support.SpringBeanAutowiringSupport;
 
@@ -26,6 +29,7 @@ import com.google.gson.Gson;
 @WebServlet("/Quartz/list")
 public class QuartzServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
+	private final Log log = LogFactory.getLog(this.getClass());
 	
 	@Autowired
 	private SchedulerFactoryBean schedulerFactory;
@@ -44,7 +48,7 @@ public class QuartzServlet extends HttpServlet {
 	@SuppressWarnings("unchecked")
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 		try {
-			List<QuartzGroup> listQuartzGroup = getQuartzJobs(request);
+			List<QuartzJob> listQuartzGroup = _listQuartzJobs(request);
 			//JSONObject jsonObject = new JSONObject();
 			Gson gson = new Gson();
 			//JSONObject<String,Object> obj=new JSONObject<String,Object>();
@@ -60,30 +64,21 @@ public class QuartzServlet extends HttpServlet {
 		}
 	}
 	
-	private List<QuartzGroup> getQuartzJobs(HttpServletRequest request) throws SchedulerException, IOException{
+	private List<QuartzJob> _listQuartzJobs(HttpServletRequest request) throws SchedulerException, IOException{
 		Scheduler scheduler = schedulerFactory.getScheduler();
+		//HttpServletRequest request = getServletRequest();
 		
 		List<QuartzGroup> listQuartzGroup = new ArrayList<QuartzGroup>();
+		List<QuartzJob> quartzJobs = new ArrayList<QuartzJob>();
+		
 		for(String groupName : scheduler.getJobGroupNames()){
 			QuartzGroup group = new QuartzGroup();
-			System.out.println("===========================");
-			System.out.println("groupName: " + groupName);
+			log.info("===========================");
+			log.info("groupName: " + groupName);
 			group.setGroupName(groupName);
 			
-			List<QuartzJob> quartzJobs = new ArrayList<QuartzJob>();
-//			for(String jobName : scheduler.getJobNames(groupName)){
-//				System.out.println("jobName: " + jobName);
-//				JobDetail jobDetail = scheduler.getJobDetail(jobName, groupName);
-//				
-//				QuartzJob job = new QuartzJob();
-//				job.setJobName(jobName);
-//				
-//				//job.setJobDetail(jobDetail);
-//				quartzJobs.add(job );
-//			}
-			
 			for(String triggerName : scheduler.getTriggerNames(groupName)){
-				System.out.println("triggerName: " + triggerName);
+				log.info("triggerName: " + triggerName);
 				Trigger trigger = scheduler.getTrigger(triggerName, groupName);
 				
 				QuartzJob job = new QuartzJob();
@@ -91,12 +86,17 @@ public class QuartzServlet extends HttpServlet {
 				job.setNextFireTime(trigger.getNextFireTime() );
 				job.setPreviousFireTime(trigger.getPreviousFireTime() );
 				
-				job.setPriority(trigger.getPriority());
+				if(trigger instanceof CronTriggerBean){
+					String expression = ((CronTriggerBean) trigger).getCronExpression();
+					job.setCronExpression(expression);
+				} 
 				
-				trigger.getJobName();
+				job.setPriority(trigger.getPriority());
+				job.setGroupName(groupName);
+				
+				//trigger.getJobName();
+				job.setJobName(trigger.getJobName() );
 				job.setRunOnceURL(request.getContextPath() + "/Quartz/fire?jobName=" + trigger.getJobName());
-				//job.setTrigger(trigger);
-				//job.setJobDetail(jobDetail);
 				quartzJobs.add(job );
 			}
 			
@@ -104,21 +104,7 @@ public class QuartzServlet extends HttpServlet {
 			listQuartzGroup.add(group);
 		}
 		
-		return listQuartzGroup;
-		
-		
-		
-//		System.out.println("groups: " + scheduler.getJobGroupNames()[0]);
-//		System.out.println("job name: " + scheduler.getJobNames("DEFAULT")[0]);
-//		
-//		System.out.println("TriggerGroupNames: " + scheduler.getTriggerGroupNames()[0]) ;
-//		System.out.println("trigger names: " + scheduler.getTriggerNames("DEFAULT")[0] );
-//		
-//		
-//		JobDetail jd = scheduler.getJobDetail("runMeJob", "DEFAULT");
-//		System.out.println(jd);
-//		
-//		scheduler.getTrigger("cronTrigger", "DEFAULT").getJobName();
+		return quartzJobs;
 	}
 	
 	class QuartzGroup implements Serializable{
@@ -147,6 +133,7 @@ public class QuartzServlet extends HttpServlet {
 	
 	class QuartzJob implements Serializable{
 		private static final long serialVersionUID = -5947319051607794745L;
+		private String groupName;
 		private String triggerName;
 		//private JobDetail jobDetail;
 		private Date nextFireTime;
@@ -154,6 +141,8 @@ public class QuartzServlet extends HttpServlet {
 		//private Trigger trigger;
 		private int priority;
 		private String runOnceURL;
+		private String jobName;
+		private String cronExpression;
 		
 		public Date getNextFireTime() {
 			return nextFireTime;
@@ -190,6 +179,24 @@ public class QuartzServlet extends HttpServlet {
 		}
 		public void setRunOnceURL(String runOnceURL) {
 			this.runOnceURL = runOnceURL;
+		}
+		public String getJobName() {
+			return jobName;
+		}
+		public void setJobName(String jobName) {
+			this.jobName = jobName;
+		}
+		public String getCronExpression() {
+			return cronExpression;
+		}
+		public void setCronExpression(String cronExpression) {
+			this.cronExpression = cronExpression;
+		}
+		public String getGroupName() {
+			return groupName;
+		}
+		public void setGroupName(String groupName) {
+			this.groupName = groupName;
 		}
 		
 	}
